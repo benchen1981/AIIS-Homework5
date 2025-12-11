@@ -139,10 +139,17 @@ class GeminiHandler:
                 try:
                      logging.info(f"Switching to fallback model 2: gemini-1.5-pro")
                      return self._get_response_with_retry("gemini-1.5-pro", system_instruction, history_for_sdk, message_parts)
-                except Exception as e_final:
-                    logging.error(f"All models failed. Final error: {e_final}")
-                    # Return the specific error to the user for better debugging
-                    return f"⚠️ **System Error / 系統錯誤**: \n\nAll AI models are currently unavailable.\n\n**Primary Error**: {str(e_primary)}\n**Fallback Error**: {str(e_final)}\n\nPlease wait a few minutes or check your API key/billing status."
+                except Exception as e_fallback_2:
+                    logging.error(f"Fallback 2 failed: {e_fallback_2}")
+                    
+                    # Try Ultimate Fallback (Legacy 1.0 Pro)
+                    try:
+                        logging.info(f"Switching to legacy fallback: gemini-pro")
+                        return self._get_response_with_retry("gemini-pro", system_instruction, history_for_sdk, message_parts)
+                    except Exception as e_final:
+                        logging.error(f"All models failed. Final error: {e_final}")
+                        # Return the specific error to the user for better debugging
+                        return f"⚠️ **System Error / 系統錯誤**: \n\nAll AI models are currently unavailable.\n\n**Primary Error**: {str(e_primary)}\n**Final Error**: {str(e_final)}\n\nPlease wait a few minutes or check your API key/billing status."
 
 # Singleton instance for easy import
 gemini = GeminiHandler()
