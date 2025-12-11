@@ -1,0 +1,196 @@
+/* Glassmorphism Design System */
+:root {
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+    --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    --backdrop-blur: blur(10px);
+    --accent-color: #00d2ff;
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0a0;
+}
+
+/* Global App Styling */
+.stApp {
+    background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+}
+
+/* Header */
+.main-header {
+    margin-top: -60px;
+    /* Pull up to hide default header space */
+    padding: 1rem 0;
+    /* Reduced padding from 2rem to 1rem */
+    text-align: center;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
+    backdrop-filter: blur(5px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
+}
+
+.main-header h1 {
+    font-size: 2.2rem;
+    /* Reduced from 3rem */
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -1px;
+    background: -webkit-linear-gradient(var(--accent-color), #3a7bd5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Input Area Styling */
+.stTextArea textarea {
+    background: rgba(0, 0, 0, 0.2) !important;
+    color: #fff !important;
+    border: var(--glass-border) !important;
+    border-radius: 12px !important;
+    backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
+}
+
+.stTextArea textarea:focus {
+    border-color: var(--accent-color) !important;
+    box-shadow: 0 0 15px rgba(0, 210, 255, 0.3) !important;
+}
+
+/* Button Styling */
+.stButton button {
+    background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 0.6rem 2rem !important;
+    font-weight: 600 !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.stButton button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 210, 255, 0.4);
+}
+
+/* Sidebar Styling */
+[data-testid="stSidebar"] {
+    background-color: rgba(15, 12, 41, 0.85);
+    /* Darker glass for sidebar */
+    backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: var(--accent-color);
+}
+
+/* File Uploader */
+[data-testid="stFileUploader"] {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    transition: border 0.3s ease;
+}
+
+[data-testid="stFileUploader"]:hover {
+    border-color: var(--accent-color);
+}
+
+.uploadedFile {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    color: #fff;
+}
+
+/* Chat Messages */
+.stChatMessage {
+    background: transparent;
+    border: none;
+}
+
+[data-testid="stChatMessageAvatarUser"] {
+    background-color: var(--accent-color);
+}
+
+[data-testid="stChatMessageAvatarAssistant"] {
+    background-color: #7d41ff;
+}
+
+div[data-testid="stChatMessageContent"] {
+    background: rgba(255, 255, 255, 0.15);
+    /* Lightened from 0.05 */
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    /* More visible border */
+    backdrop-filter: blur(12px);
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Specific styling for user vs ai content if needed */
+.user-message div[data-testid="stChatMessageContent"] {
+    background: rgba(0, 210, 255, 0.15);
+    /* Slight blue tint for user */
+}
+
+/* Input Card Styling */
+.input-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 20px;
+    height: 100%;
+    position: relative;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Action Buttons (Simulated via st.button but usually need custom HTML for exact look, we will use standard buttons with class styling if possible, or Streamlit styling) */
+/* Actually, Streamlit buttons are hard to target individually without generic selectors. 
+   We will rely on columns and standard secondary buttons for the 'square' look. 
+   We'll add a specific class wrapper if we use st.markdown buttons, but sticking to st.button is safer for logic. */
+
+div[data-testid="column"] button {
+    height: 80px;
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    transition: all 0.3s;
+}
+
+div[data-testid="column"] button:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--accent-color);
+    transform: translateY(-2px);
+}
+
+/* Check Button */
+.check-btn-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: auto;
+    padding-top: 20px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.element-container {
+    animation: fadeIn 0.5s ease-out forwards;
+}
