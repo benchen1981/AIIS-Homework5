@@ -17,10 +17,11 @@ class GeminiHandler:
         genai.configure(api_key=self.api_key)
         
         # Primary and Fallback Models
-        # flash-8b is often cheapest/fastest, but 1.5-flash is standard stable. 
-        # 2.0-flash-exp (or 2.5) might be preview with low limits.
-        self.primary_model = "gemini-1.5-flash" 
-        self.fallback_model = "gemini-1.5-flash-8b"
+        # User environment seems to specificall support 'gemini-2.5-flash' (despite 429s).
+        # Standard 1.5 models are returning 404s.
+        self.primary_model = "gemini-2.5-flash" 
+        self.fallback_model = "gemini-2.0-flash-exp" # Guessing another experimental one?
+
         
         # Base generation config
         self.generation_config = {
