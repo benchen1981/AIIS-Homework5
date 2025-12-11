@@ -42,3 +42,12 @@ This document records the major issues encountered during development and the pr
 **Resolution**:
 - Optimized data sampling for t-SNE to reduce computational load.
 - Fixed plot label encoding to ensuring English labels were used to avoid font issues.
+
+## 6. API 429 Quota Exceeded & Model Fallback
+**Issue**: The usage of `gemini-2.5-flash` resulted in `429 Quota Exceeded` errors on Streamlit Cloud (approx. 20 requests/day limit on the specific free tier metric used).
+**Debugging Prompt**:
+> "System Error: 429 You exceeded your current quota... limit: 20, model: gemini-2.5-flash"
+**Resolution**:
+- **Model Switch**: Changed the primary model to `gemini-1.5-flash` which generally has better free-tier availability (15 RPM / 1500 RPD).
+- **Fallback Logic**: Implemented an automatic fallback to `gemini-1.5-flash-8b` if the primary model fails.
+- **Robustness**: Added a `_get_response_with_retry` method that catches `ResourceExhausted` and `ServiceUnavailable` errors, applying exponential backoff before failing over.
