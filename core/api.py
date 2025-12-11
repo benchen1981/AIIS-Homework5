@@ -3,6 +3,7 @@ import time
 import google.generativeai as genai
 from google.generativeai import caching
 import logging
+from google.api_core import exceptions
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -14,40 +15,19 @@ class GeminiHandler:
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY not found in environment variables.")
         genai.configure(api_key=self.api_key)
-        self.model_name = "gemini-2.5-flash" # Confirmed available model
+        
+        # Primary and Fallback Models
+        # flash-8b is often cheapest/fastest, but 1.5-flash is standard stable. 
+        # 2.0-flash-exp (or 2.5) might be preview with low limits.
+        self.primary_model = "gemini-1.5-flash" 
+        self.fallback_model = "gemini-1.5-flash-8b"
         
         # Base generation config
         self.generation_config = {
-            "temperature": 0.2, # Low temp for analytical/detection tasks
+            "temperature": 0.2, 
             "top_p": 0.95,
             "max_output_tokens": 8192,
         }
-
-    def create_file_search_store(self, display_name="RAG_Knowledge_Base"):
-        """Create a new File Search Store."""
-        try:
-            # Check if store exists (optional optimization, here we just create new or return existing ID logic if you tracked it)
-            # For this MVP, we create a new one to ensure fresh context or handle it via a manager
-            # In a real app, you might list and reuse.
-            pass 
-        except Exception as e:
-            logging.error(f"Error creating store: {e}")
-            return None
-
-    def list_stores(self):
-        """List available file search stores."""
-        try:
-            # Note: The Python SDK currently manages caches differently than the REST API 'FileSearchStore'
-            # We will use the 'Caching' API if available or standard file API.
-            # *Correction*: As of late 2024, the SDK uses `genai.Caching` or plain `genai.upload_file` for context.
-            # For "File Search" specifically (the feature in the JSON), we stick to the 1.5 features.
-            # We will implement a simplified version: Upload files -> Pass to model.
-            # Real "File Search Store" management often requires the beta REST API or specific SDK update.
-            # We will use the 'files' API and pass them to the model context directly or via a tool if supported.
-            return []
-        except Exception as e:
-            logging.error(f"Error listing stores: {e}")
-            return []
 
     def upload_file(self, file_path, display_name=None):
         """Uploads a file to Google GenAI."""
@@ -72,16 +52,49 @@ class GeminiHandler:
             logging.error(f"Upload failed: {e}")
             return None
 
+    def _get_response_with_retry(self, model_name, system_instruction, history, message_parts):
+        """Helper to call API with retries."""
+        max_retries = 3
+        delay = 2 # Initial delay seconds
+        
+        for attempt in range(max_retries):
+            try:
+                model = genai.GenerativeModel(
+                    model_name=model_name,
+                    system_instruction=system_instruction
+                )
+                chat = model.start_chat(history=history)
+                response = chat.send_message(message_parts, generation_config=self.generation_config)
+                return response.text
+                
+            except exceptions.ResourceExhausted as e:
+                # 429 Quota Exceeded
+                logging.warning(f"Quota exceeded for {model_name}. Attempt {attempt+1}/{max_retries}. Retrying in {delay}s...")
+                if attempt == max_retries - 1:
+                    raise e # Re-raise if final attempt
+                time.sleep(delay)
+                delay *= 2 # Exponential backoff
+                
+            except exceptions.ServiceUnavailable as e:
+                # 503 Service Unavailable
+                logging.warning(f"Service unavailable for {model_name}. Retrying in {delay}s...")
+                time.sleep(delay)
+            except Exception as e:
+                # Other errors, maybe fail fast?
+                if "429" in str(e):
+                     # Handle cases where Exception wraps the 429
+                    logging.warning(f"Rate limit hit ({e}). Retrying...")
+                    time.sleep(delay)
+                    delay *= 2
+                else:
+                    raise e
+                    
+        raise Exception("Max retries exceeded.")
+
     def generate_response(self, user_prompt, file_uris=None, chat_history=None):
         """
-        Generates a response from Gemini, optionally using RAG (uploaded files).
-        
-        Args:
-            user_prompt (str): The user's input text.
-            file_uris (list): List of file URIs (from upload_file) to include as context.
-            chat_history (list): Previous chat history (standard list of dicts).
+        Generates a response from Gemini, handling rate limits and fallbacks.
         """
-        # Config system prompt
         system_instruction = """
         You are an elite AI Content Detection Analyst. Your task is to analyze the input text and determine the likelihood of it being AI-generated.
         
@@ -97,43 +110,31 @@ class GeminiHandler:
         If reference files are provided (RAG context), compare the input style to those documents to inform your decision.
         """
         
+        # Prepare Chat History
+        history_for_sdk = []
+        if chat_history:
+            for msg in chat_history:
+                role = "user" if msg["role"] == "user" else "model"
+                history_for_sdk.append({"role": role, "parts": [msg["content"]]})
+        
+        message_parts = []
+        if file_uris:
+            message_parts.extend(file_uris)
+        message_parts.append(user_prompt)
+
+        # Strategy: Try Primary -> Try Fallback -> Return Friendly Error
         try:
-            model = genai.GenerativeModel(
-                model_name=self.model_name,
-                system_instruction=system_instruction
-            )
+            return self._get_response_with_retry(self.primary_model, system_instruction, history_for_sdk, message_parts)
+        except Exception as e_primary:
+            logging.error(f"Primary model {self.primary_model} failed: {e_primary}")
             
-            # Prepare Chat History
-            history_for_sdk = []
-            if chat_history:
-                for msg in chat_history:
-                    role = "user" if msg["role"] == "user" else "model"
-                    history_for_sdk.append({"role": role, "parts": [msg["content"]]})
-
-            chat = model.start_chat(history=history_for_sdk)
-            
-            # Construct the message
-            # If we have files, we pass them in the message parts
-            message_parts = []
-            
-            # Add files to context if present
-            if file_uris:
-                # In the updated SDK, you often pass the file object or URI in the parts list
-                # However, for RAG validation, we might just pass the file_ref.
-                # Since we stored URIs mostly, we need to pass the file objects or let the SDK handle it.
-                # We will assume `file_uris` contains the actual File objects returned by upload_file for now,
-                # or we fetch them if they are just strings.
-                
-                # Warning: Directly passing file_ref works in 1.5 Flash.
-                message_parts.extend(file_uris)
-            
-            message_parts.append(user_prompt)
-            
-            response = chat.send_message(message_parts, generation_config=self.generation_config)
-            return response.text
-
-        except Exception as e:
-            return f"System Error: {str(e)}"
+            # Try Fallback
+            try:
+                logging.info(f"Switching to fallback model: {self.fallback_model}")
+                return self._get_response_with_retry(self.fallback_model, system_instruction, history_for_sdk, message_parts)
+            except Exception as e_fallback:
+                logging.error(f"Fallback model failed: {e_fallback}")
+                return "⚠️ **System Error / 系統錯誤**: The AI service is currently experiencing high traffic (Quota Exceeded). Please wait 60 seconds and try again. / 目前AI服務繁忙，請稍後再試。"
 
 # Singleton instance for easy import
 gemini = GeminiHandler()
