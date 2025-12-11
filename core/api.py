@@ -152,20 +152,53 @@ class GeminiHandler:
                         try:
                             logging.info("Attempting auto-discovery of available models...")
                             available_models = []
+                            all_models_debug = []
                             for m in genai.list_models():
+                                all_models_debug.append(f"{m.name} ({m.supported_generation_methods})")
                                 if 'generateContent' in m.supported_generation_methods:
-                                    available_models.append(m.name)
+                                    # Prefer flash models if available
+                                    if "flash" in m.name:
+                                        available_models.insert(0, m.name)
+                                    else:
+                                        available_models.append(m.name)
                             
+                            debug_model_list = "\n".join(all_models_debug) if all_models_debug else "No models returned by ListModels."
+
                             if available_models:
-                                auto_model = available_models[0]
-                                logging.info(f"Found available model: {auto_model}. Retrying...")
-                                return self._get_response_with_retry(auto_model, system_instruction, history_for_sdk, message_parts)
+                                # Try the first 3 discovered models
+                                for model_name in available_models[:3]:
+                                    try:
+                                        logging.info(f"Trying auto-discovered model: {model_name}")
+                                        return self._get_response_with_retry(model_name, system_instruction, history_for_sdk, message_parts)
+                                    except Exception as e:
+                                        logging.warning(f"Auto-discovered model {model_name} failed: {e}")
+                                
+                                raise Exception("All auto-discovered models failed.")
                             else:
-                                raise Exception("No models found with generateContent capability.")
+                                raise Exception(f"No models found with generateContent capability. Visible: {debug_model_list}")
 
                         except Exception as e_auto:
                             logging.error(f"Auto-discovery failed: {e_auto}")
-                            return f"⚠️ **System Error / 系統錯誤**: \n\nAll AI models are currently unavailable.\n\n**Debug Info**: Unable to find any working model for key ending in ...{self.api_key[-4:] if self.api_key else 'N/A'}.\n**Primary Error**: {str(e_primary)}\n**Final Error**: {str(e_final)}\n\nPlease check that the **Google Generative AI API** is enabled in your Google Cloud Console."
+                            # Clean up debug list for display
+                            safe_debug_list = debug_model_list if 'debug_model_list' in locals() else "List failed"
+                            
+                            return f"""⚠️ **System Error / 系統錯誤**: 
+All AI models are currently unavailable.
+
+**Diagnosis**:
+The Primary model ({self.primary_model}) hit a 429 Quota limit ({str(e_primary)[:100]}...).
+We attempted to find other models, but failed.
+
+**Available Models on your Account**:
+```
+{safe_debug_list}
+```
+
+**Action**:
+1. If you see 'gemini-1.5-flash' in the list above, the API names might be mismatching.
+2. If the list is empty or only contains experimental models, your API Key might be restricted.
+3. Please check your [Google AI Studio](https://aistudio.google.com/) API key settings.
+"""
 
 # Singleton instance for easy import
 gemini = GeminiHandler()
