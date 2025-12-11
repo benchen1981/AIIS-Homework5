@@ -147,9 +147,24 @@ class GeminiHandler:
                         logging.info(f"Switching to legacy fallback: gemini-pro")
                         return self._get_response_with_retry("gemini-pro", system_instruction, history_for_sdk, message_parts)
                     except Exception as e_final:
-                        logging.error(f"All models failed. Final error: {e_final}")
-                        # Return the specific error to the user for better debugging
-                        return f"⚠️ **System Error / 系統錯誤**: \n\nAll AI models are currently unavailable.\n\n**Primary Error**: {str(e_primary)}\n**Final Error**: {str(e_final)}\n\nPlease wait a few minutes or check your API key/billing status."
+                        # Auto-discovery fallback
+                        try:
+                            logging.info("Attempting auto-discovery of available models...")
+                            available_models = []
+                            for m in genai.list_models():
+                                if 'generateContent' in m.supported_generation_methods:
+                                    available_models.append(m.name)
+                            
+                            if available_models:
+                                auto_model = available_models[0]
+                                logging.info(f"Found available model: {auto_model}. Retrying...")
+                                return self._get_response_with_retry(auto_model, system_instruction, history_for_sdk, message_parts)
+                            else:
+                                raise Exception("No models found with generateContent capability.")
+
+                        except Exception as e_auto:
+                            logging.error(f"Auto-discovery failed: {e_auto}")
+                            return f"⚠️ **System Error / 系統錯誤**: \n\nAll AI models are currently unavailable.\n\n**Debug Info**: Unable to find any working model for key ending in ...{self.api_key[-4:] if self.api_key else 'N/A'}.\n**Primary Error**: {str(e_primary)}\n**Final Error**: {str(e_final)}\n\nPlease check that the **Google Generative AI API** is enabled in your Google Cloud Console."
 
 # Singleton instance for easy import
 gemini = GeminiHandler()
